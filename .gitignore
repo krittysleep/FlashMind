@@ -1,0 +1,23 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Node Modules
+node_modules/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+flashmind.db
+flashmind.db-shm
+flashmind.db-wal
+
+# Environment Variables
+.env
+.env.local
+
+# OS Files
+.DS_Store
+Thumbs.db
