@@ -86,15 +86,15 @@ let availableVoices = [];
 function populateVoiceList() {
   if (!synth) return;
   availableVoices = synth.getVoices();
-  
+
   // Clear options except default
   voiceSelect.innerHTML = '<option value="">Default Voice</option>';
-  
+
   availableVoices.forEach(voice => {
     const option = document.createElement('option');
     option.textContent = `${voice.name} (${voice.lang})`;
     option.value = voice.name;
-    
+
     // Auto select English or Spanish system voice as standard if possible
     if (voice.default) {
       option.selected = true;
@@ -109,19 +109,19 @@ function speakText(text) {
   if (synth.speaking) {
     synth.cancel(); // Stop current speech immediately
   }
-  
+
   if (!text) return;
-  
+
   const utterance = new SpeechSynthesisUtterance(text);
   const selectedVoiceName = voiceSelect.value;
-  
+
   if (selectedVoiceName) {
     const selectedVoice = availableVoices.find(v => v.name === selectedVoiceName);
     if (selectedVoice) {
       utterance.voice = selectedVoice;
     }
   }
-  
+
   // Set slight voice rate parameters for extra clarity
   utterance.rate = 0.95;
   synth.speak(utterance);
@@ -187,12 +187,12 @@ function saveDecks() {
 // --- Navigation / View Routing ---
 function switchView(viewName) {
   currentView = viewName;
-  
+
   // Cancel speech synthesis when changing views
   if (synth && synth.speaking) {
     synth.cancel();
   }
-  
+
   Object.keys(views).forEach(key => {
     if (key === viewName) {
       views[key].classList.add('active');
@@ -210,7 +210,7 @@ function switchView(viewName) {
 // --- Dashboard View Rendering ---
 function renderDashboard() {
   decksGrid.innerHTML = '';
-  
+
   if (decks.length === 0) {
     decksGrid.innerHTML = `
       <div class="glass-panel" style="grid-column: 1 / -1; text-align: center; padding: 3rem; display: flex; flex-direction: column; gap: 1rem; align-items: center;">
@@ -227,10 +227,10 @@ function renderDashboard() {
   decks.forEach(deck => {
     const cardEl = document.createElement('div');
     cardEl.className = `deck-card color-${deck.color || 'purple'}`;
-    
+
     const cardCount = deck.cards ? deck.cards.length : 0;
     const cardsLabel = cardCount === 1 ? '1 card' : `${cardCount} cards`;
-    
+
     cardEl.innerHTML = `
       <div class="deck-info">
         <div class="deck-card-title">${escapeHTML(deck.name)}</div>
@@ -255,20 +255,20 @@ function renderDashboard() {
         </button>
       </div>
     `;
-    
+
     // Bind actions
     cardEl.querySelector('.btn-study').addEventListener('click', (e) => {
       if (cardCount > 0) startStudySession(deck);
     });
-    
+
     cardEl.querySelector('.btn-edit').addEventListener('click', () => {
       openDeckEditor(deck);
     });
-    
+
     cardEl.querySelector('.btn-delete').addEventListener('click', () => {
       openDeleteConfirmModal(deck);
     });
-    
+
     decksGrid.appendChild(cardEl);
   });
 }
@@ -290,7 +290,7 @@ function startStudySession(deck, cardSubset = null) {
   studySession.correct = [];
   studySession.incorrect = [];
   studySession.isFlipped = false;
-  
+
   flashcardElement.classList.remove('flipped');
   updateStudyCardUI();
   switchView('study');
@@ -301,49 +301,39 @@ function updateStudyCardUI() {
   if (!currentCard) return;
 
   // Text setup with Part of Speech parser
-  // Matches: "Word (pos.)" where pos can be any abbreviation combination
-  const frontMatch = currentCard.front.match(/^(.+?)\s+\(([^)]+)\)$/i);
+  const frontMatch = currentCard.front.match(/^(.+)\s+\((v\.|n\.|adj\.|adv\.|n\.\/adj\.|n\.\/v\.)\)$/i);
   if (frontMatch) {
     const word = frontMatch[1].trim();
     const posAbbr = frontMatch[2].trim().toLowerCase();
-    
-    // Map abbreviation to display label and CSS class
-    const posMap = {
-      'v.':       { name: 'verb',             cls: 'verb' },
-      'n.':       { name: 'noun',             cls: 'noun' },
-      'adj.':     { name: 'adjective',        cls: 'adjective' },
-      'adv.':     { name: 'adverb',           cls: 'adverb' },
-      'n./adj.':  { name: 'noun / adj',       cls: 'other' },
-      'adj./n.':  { name: 'adj / noun',       cls: 'other' },
-      'n./v.':    { name: 'noun / verb',      cls: 'other' },
-      'v./n.':    { name: 'verb / noun',      cls: 'other' },
-      'adj./adv.':{ name: 'adj / adverb',     cls: 'other' },
-      'prep.':    { name: 'preposition',      cls: 'other' },
-      'conj.':    { name: 'conjunction',      cls: 'other' },
-      'pron.':    { name: 'pronoun',          cls: 'other' },
-      'interj.':  { name: 'interjection',     cls: 'other' },
-    };
-    
-    const posInfo = posMap[posAbbr] || { name: posAbbr, cls: 'other' };
-    
+
+    let posFullName = 'other';
+    let posClass = 'other';
+
+    if (posAbbr === 'v.') { posFullName = 'verb'; posClass = 'verb'; }
+    else if (posAbbr === 'n.') { posFullName = 'noun'; posClass = 'noun'; }
+    else if (posAbbr === 'adj.') { posFullName = 'adjective'; posClass = 'adjective'; }
+    else if (posAbbr === 'adv.') { posFullName = 'adverb'; posClass = 'adverb'; }
+    else if (posAbbr === 'n./adj.') { posFullName = 'noun / adj'; posClass = 'other'; }
+    else if (posAbbr === 'n./v.') { posFullName = 'noun / verb'; posClass = 'other'; }
+
     cardFrontText.innerHTML = `
       <div class="word-display">${escapeHTML(word)}</div>
-      <span class="pos-badge ${posInfo.cls}">${posInfo.name}</span>
+      <span class="pos-badge ${posClass}">${posFullName}</span>
     `;
   } else {
     cardFrontText.textContent = currentCard.front;
   }
-  
+
   // Format the back to render linebreaks (\n) nicely as HTML line breaks
   cardBackText.innerHTML = escapeHTML(currentCard.back).replace(/\n/g, '<br>');
-  
+
   // Progress Bar & Counter
   const total = studySession.cards.length;
   const progressPercent = ((studySession.currentIndex) / total) * 100;
   studyProgressBar.style.width = `${progressPercent}%`;
-  
+
   studyProgressText.textContent = `Card ${studySession.currentIndex + 1} / ${total}`;
-  
+
   // Flip animation state management
   studySession.isFlipped = false;
   flashcardElement.classList.remove('flipped');
@@ -361,17 +351,17 @@ function flipCard() {
 
 function handleCardEvaluation(isCorrect) {
   const card = studySession.cards[studySession.currentIndex];
-  
+
   if (isCorrect) {
     studySession.correct.push(card);
   } else {
     studySession.incorrect.push(card);
   }
-  
+
   // Advance or Complete
   if (studySession.currentIndex < studySession.cards.length - 1) {
     studySession.currentIndex++;
-    
+
     // Card slide-out slide-in transition simulation
     flashcardElement.style.opacity = '0';
     flashcardElement.style.transform = 'translateY(10px) rotateY(0)';
@@ -380,7 +370,7 @@ function handleCardEvaluation(isCorrect) {
       flashcardElement.style.opacity = '1';
       flashcardElement.style.transform = '';
     }, 200);
-    
+
   } else {
     // Session completed! Update final progress bar
     studyProgressBar.style.width = '100%';
@@ -392,19 +382,19 @@ function handleCardEvaluation(isCorrect) {
 
 function showStudyResults() {
   resultsDeckName.textContent = currentDeck.name;
-  
+
   const correctNum = studySession.correct.length;
   const incorrectNum = studySession.incorrect.length;
   const total = studySession.cards.length;
-  
+
   statCorrectCount.textContent = correctNum;
   statIncorrectCount.textContent = incorrectNum;
-  
+
   const percentage = Math.round((correctNum / total) * 100);
   resultsPercentage.textContent = `Success Rate: ${percentage}%`;
-  
 
-  
+
+
   switchView('results');
 }
 
@@ -433,7 +423,7 @@ function openDeckEditor(deck = null) {
       { id: generateId(), front: '', back: '' }
     ];
   }
-  
+
   updateColorPickerUI();
   renderEditorCards();
   switchView('editor');
@@ -486,14 +476,14 @@ function renderEditorCards() {
         </svg>
       </button>
     `;
-    
+
     // Bind individual delete button
     cardItem.querySelector('.btn-delete-card').addEventListener('click', () => {
       syncEditorInputs();
       editorState.cards.splice(index, 1);
       renderEditorCards();
     });
-    
+
     editorCardsList.appendChild(cardItem);
   });
 }
@@ -501,22 +491,22 @@ function renderEditorCards() {
 function saveActiveDeck() {
   const name = deckTitleInput.value.trim();
   const description = deckDescInput.value.trim();
-  
+
   if (!name) {
     alert("Please enter a deck name.");
     deckTitleInput.focus();
     return;
   }
-  
+
   syncEditorInputs();
-  
+
   // Validate that cards are populated and don't contain empty values
   const validCards = editorState.cards.filter(c => c.front.trim() || c.back.trim());
   if (validCards.length === 0) {
     alert("Please add at least one card with front or back content before saving.");
     return;
   }
-  
+
   // Format cards (ensure no blank values remain, assign IDs if needed)
   const finalCards = validCards.map(c => ({
     id: c.id || generateId(),
@@ -544,7 +534,7 @@ function saveActiveDeck() {
     };
     decks.push(newDeck);
   }
-  
+
   saveDecks();
   switchView('dashboard');
 }
@@ -626,13 +616,13 @@ btnStudyBack.addEventListener('click', () => {
 // Global document-level click handler for study card flips to ensure compatibility across all browsers
 document.addEventListener('click', (e) => {
   if (currentView !== 'study') return;
-  
+
   // If clicked element or its parent is the card or wrapper
   const isCardClick = e.target.closest('#flashcard') || e.target.closest('#study-card-wrapper');
   if (isCardClick) {
     // Ignore clicks if they occurred on action buttons (like TTS) or dropdowns
     if (e.target.closest('.btn') || e.target.closest('select')) return;
-    
+
     console.log("Global document handler captured card click. Target:", e.target);
     flipCard();
   }
@@ -641,7 +631,7 @@ document.addEventListener('click', (e) => {
 btnStudyTts.addEventListener('click', () => {
   const currentCard = studySession.cards[studySession.currentIndex];
   if (!currentCard) return;
-  
+
   let textToRead = '';
   if (studySession.isFlipped) {
     // If card is flipped to the back, read the Example sentence if available, otherwise read the clean word
@@ -678,7 +668,7 @@ btnAddEditorCard.addEventListener('click', () => {
   syncEditorInputs();
   editorState.cards.push({ id: generateId(), front: '', back: '' });
   renderEditorCards();
-  
+
   // Auto scroll to the newly added row
   setTimeout(() => {
     editorCardsList.lastElementChild?.scrollIntoView({ behavior: 'smooth' });
@@ -766,7 +756,7 @@ window.addEventListener('keydown', (e) => {
       flipCard();
       return;
     }
-    
+
     switch (e.key.toLowerCase()) {
       case 'a': // Needs review
         handleCardEvaluation(false);
@@ -803,19 +793,6 @@ const grammarData = [
     thai: 'คำนาม',
     color: '#3b82f6', // blue
     desc: 'ใช้เรียกชื่อคน สัตว์ สิ่งของ สถานที่ หรือแนวคิดนามธรรม (เช่น idea, knowledge) เป็นส่วนสำคัญมากในการจับใจความหลักของประโยค',
-    suffixes: [
-      { suffix: '-tion / -sion', meaning: 'แปลกริยา → คำนาม', example: 'inform → informa<strong>tion</strong>, discuss → discu<strong>ssion</strong>', color: '#3b82f6' },
-      { suffix: '-ness', meaning: 'แปลคุณศัพท์ → คำนามที่แสดงสภาพ', example: 'happy → happi<strong>ness</strong>, aware → aware<strong>ness</strong>', color: '#8b5cf6' },
-      { suffix: '-ment', meaning: 'แปลกริยา → ผลลัพธ์หรืออาการ', example: 'achieve → achieve<strong>ment</strong>, develop → develop<strong>ment</strong>', color: '#10b981' },
-      { suffix: '-ity / -ty', meaning: 'แปลคุณศัพท์ → คุณภาพหรือสภาพ', example: 'complex → complex<strong>ity</strong>, safe → safe<strong>ty</strong>', color: '#f59e0b' },
-      { suffix: '-er / -or', meaning: 'ผู้กระทำ, สิ่งที่กระทำ', example: 'teach → teach<strong>er</strong>, invest → invest<strong>or</strong>', color: '#ec4899' },
-      { suffix: '-ance / -ence', meaning: 'เป็นสภาวะหรือคุณสมบัติ', example: 'perform → perform<strong>ance</strong>, depend → depend<strong>ence</strong>', color: '#ef4444' },
-      { suffix: '-dom', meaning: 'สถานะ, อาณาเขต', example: 'free → free<strong>dom</strong>, king → king<strong>dom</strong>', color: '#14b8a6' },
-      { suffix: '-hood', meaning: 'ช่วงเวลา, สภาวะ, กลุ่ม', example: 'child → child<strong>hood</strong>, neighbor → neighbor<strong>hood</strong>', color: '#6366f1' },
-      { suffix: '-tude', meaning: 'สภาพ, ลักษณะ', example: 'exact → exac<strong>tude</strong>, atti<strong>tude</strong>', color: '#d946ef' },
-      { suffix: '-ship', meaning: 'ทักษะ, สถานะ, ความสัมพันธ์', example: 'friend → friend<strong>ship</strong>, leader → leader<strong>ship</strong>', color: '#f43f5e' },
-      { suffix: '-ism', meaning: 'ลัทธิ, ระบบ, ความเชื่อ', example: 'capital → capital<strong>ism</strong>, real → real<strong>ism</strong>', color: '#84cc16' }
-    ],
     words: [
       { word: 'Acquisition', meaning: 'การได้รับมา, การเข้าถือสิทธิ์', example: 'The <span class="grammar-highlight">acquisition</span> of new vocabulary takes time and practice.' },
       { word: 'Analysis', meaning: 'การวิเคราะห์, การแยกแยะ', example: 'The data <span class="grammar-highlight">analysis</span> revealed a significant trend.' },
@@ -839,63 +816,11 @@ const grammarData = [
     }
   },
   {
-    id: 'pronoun',
-    name: 'Pronoun',
-    thai: 'คำสรรพนาม',
-    color: '#a855f7', // purple
-    desc: 'ใช้แทนคำนาม (เช่น it, they, this, which) เพื่อลดการใช้คำซ้ำซ้อน ช่วยให้ประโยคใน Reading และ Writing สละสลวยขึ้น',
-    notes: [
-      { title: 'Indefinite Pronouns', desc: 'สรรพนามไม่ชี้เฉพาะ เช่น everyone, someone, anybody, nothing. คำเหล่านี้มักจะถือว่าเป็น<strong>เอกพจน์ (Singular)</strong> เสมอ ดังนั้นต้องใช้กริยาเอกพจน์<div class="grammar-note-example"><strong>Example:</strong> Everyone <strong>is</strong> here. (ไม่ใช่ are)</div>' },
-      { title: 'Possessive Pronouns', desc: 'สรรพนามแสดงความเป็นเจ้าของที่ใช้เดี่ยวๆ ได้เลยโดยไม่ต้องมีนามตามหลัง เช่น mine, yours, hers, ours, theirs.<div class="grammar-note-example"><strong>Example:</strong> This book is <strong>mine</strong>.</div>' },
-      { title: 'The Tricky "Their"', desc: 'คำว่า <strong>their</strong> เป็น Possessive Adjective (ต้องมีนามตามหลัง เช่น their car) ระวังสับสนกับ <strong>they\'re</strong> (they are) และ <strong>there</strong> (ที่นั่น). นอกจากนี้ในภาษาอังกฤษยุคใหม่ <strong>their</strong> ยังถูกใช้เป็นสรรพนามเอกพจน์เพื่อหลีกเลี่ยงการระบุเพศ (Singular Their)<div class="grammar-note-example"><strong>Example:</strong> Someone left <strong>their</strong> umbrella.</div>' }
-    ],
-    words: [
-      { word: 'They / Them', meaning: 'พวกเขา / พวกมัน', example: 'Students should review their notes if <span class="grammar-highlight">they</span> want to pass.' },
-      { word: 'Which', meaning: 'ซึ่ง, อันที่', example: 'He bought a new laptop, <span class="grammar-highlight">which</span> was very expensive.' },
-      { word: 'Those', meaning: 'เหล่านั้น', example: '<span class="grammar-highlight">Those</span> who study daily tend to perform better.' },
-      { word: 'Anyone', meaning: 'ใครก็ได้', example: '<span class="grammar-highlight">Anyone</span> can join the competition.' },
-      { word: 'Whatever', meaning: 'อะไรก็ตาม', example: 'You can eat <span class="grammar-highlight">whatever</span> you want.' },
-      { word: 'Themselves', meaning: 'พวกเขากันเอง/ด้วยตัวเอง', example: 'The students organized the event <span class="grammar-highlight">themselves</span>.' },
-      { word: 'Neither', meaning: 'ไม่ทั้งสองอย่าง', example: '<span class="grammar-highlight">Neither</span> of the answers is correct.' },
-      { word: 'Theirs', meaning: 'ของพวกเขา', example: 'Our team won, but <span class="grammar-highlight">theirs</span> lost the game.' }
-    ],
-    challenge: {
-      type: 'Pronoun',
-      sentence: [
-        { text: 'Many', isTarget: false },
-        { text: 'students', isTarget: false },
-        { text: 'struggle,', isTarget: false },
-        { text: 'but', isTarget: false },
-        { text: 'they', isTarget: true },
-        { text: 'can', isTarget: false },
-        { text: 'improve.', isTarget: false }
-      ],
-      successMsg: 'ถูกต้อง! they แทนคำว่า students ในประโยคก่อนหน้า',
-      errorMsg: 'ลองอีกครั้ง! หาคำที่ใช้แทนคำนามที่กล่าวมาแล้ว'
-    }
-  },
-  {
     id: 'verb',
     name: 'Verb',
     thai: 'คำกริยา',
     color: '#ef4444', // red
     desc: 'ใช้แสดงการกระทำหรือสภาพ (เช่น analyze, occur) เป็นหัวใจของประโยค ถ้าขาดคำกริยา ประโยคจะไม่สมบูรณ์',
-    suffixes: [
-      { suffix: '-ize / -ise', meaning: 'ทำให้เป็น...', example: 'real → real<strong>ize</strong>, organ → organ<strong>ise</strong>', color: '#3b82f6' },
-      { suffix: '-ify', meaning: 'ทำให้กลายเป็น...', example: 'simple → simpl<strong>ify</strong>, class → class<strong>ify</strong>', color: '#10b981' },
-      { suffix: '-en', meaning: 'ทำให้เป็น..., เพิ่มขึ้น', example: 'length → length<strong>en</strong>, short → short<strong>en</strong>', color: '#f59e0b' },
-      { suffix: '-ate', meaning: 'ทำให้เกิด..., แสดงการกระทำ', example: 'active → activ<strong>ate</strong>, motive → motiv<strong>ate</strong>', color: '#8b5cf6' }
-    ],
-    notes: [
-      { title: 'Main vs. Helping (Modal) Verbs', desc: '<strong>Main Verb</strong> (กริยาหลัก) คือการกระทำหลักของประโยค ส่วน <strong>Helping Verb</strong> (กริยาช่วย) ใช้คู่กับกริยาหลักเพื่อบอกกาลเวลาหรือเจตนา โดยมีกลุ่มสำคัญคือ <strong>Modal Verbs</strong> (can, could, will, would, should, must, may, might) ซึ่งกริยาที่ตามหลัง Modal Verb ต้องเป็นรูปเดิม (Infinitive) เสมอโดยไม่เติม -s, -ed, หรือ -ing<div class="grammar-note-example"><strong>Example:</strong> She <strong>can speak</strong> three languages. (ไม่ใช่ can speaks)</div>' },
-      { title: 'Singular & Plural Verbs (กริยาเอกพจน์-พหูพจน์)', desc: 'Subject-Verb Agreement เป็นเรื่องที่ออกสอบบ่อยที่สุด! ถ้าประธานมีคนเดียว/สิ่งเดียว (Singular: He, She, It, นามนับไม่ได้) กริยาช่อง 1 ต้องเติม <strong>-s หรือ -es</strong> แต่ถ้าประธานมีหลายคน/สิ่ง (Plural: I, You, We, They) ให้ใช้กริยารูปปกติ<div class="grammar-note-example"><strong>Example (Singular):</strong> The scientist <strong>analyzes</strong> the data.<br><strong>Example (Plural):</strong> They <strong>analyze</strong> the data.</div>' },
-      { title: 'Linking Verbs (กริยาเชื่อมความ)', desc: 'กริยากลุ่มนี้ไม่ได้แสดงการกระทำทางกายภาพ แต่ทำหน้าที่ <strong>เชื่อมประธานเข้ากับคำคุณศัพท์ (Adjective) หรือคำนาม</strong> เพื่อบอกสภาพหรือความรู้สึก เช่น is/am/are, feel, look, seem, taste, smell, become.<div class="grammar-note-example">✅ <strong>ถูก:</strong> The data <strong>looks <span style="text-decoration:underline;">promising</span></strong>. (ใช้ Adjective)<br>❌ <strong>ผิด:</strong> The data looks <em>promisingly</em>. (ห้ามใช้ Adverb ขยาย Linking Verb)</div>' }
-    ],
-    advancedPatterns: [
-      { title: 'Verbs + to-infinitive', desc: 'กริยาบางคำต้องตามด้วย <strong>to + V.1</strong> เสมอ เช่น want, plan, decide, hope, promise, agree.', example: 'I <strong>decided to study</strong> abroad next year.' },
-      { title: 'Verbs + V-ing (Gerund)', desc: 'กริยาบางคำต้องตามด้วย <strong>V-ing</strong> เสมอ เช่น enjoy, mind, suggest, avoid, finish, consider.', example: 'She <strong>enjoys reading</strong> books in her free time.' },
-      { title: 'Verbs + to-infinitive OR V-ing (ความหมายต่างกัน)', desc: 'กริยาบางคำเช่น <strong>stop, remember, forget</strong> ตามได้ทั้งสองแบบแต่ความหมายจะเปลี่ยนไป<br>• stop + V-ing = หยุดทำสิ่งนั้น (He stopped smoking)<br>• stop + to-infinitive = หยุด(เพื่อ)ไปทำสิ่งใหม่ (He stopped to smoke)', example: 'I <strong>remember locking</strong> the door. (จำได้ว่าทำไปแล้ว)<br>Please <strong>remember to lock</strong> the door. (อย่าลืมทำ)' }
-    ],
     words: [
       { word: 'Analyze', meaning: 'วิเคราะห์', example: 'We must <span class="grammar-highlight">analyze</span> the results before drawing conclusions.' },
       { word: 'Demonstrate', meaning: 'สาธิต, แสดงให้เห็น', example: 'The experiment will <span class="grammar-highlight">demonstrate</span> how the process works.' },
@@ -975,6 +900,36 @@ const grammarData = [
       ],
       successMsg: 'เยี่ยมมาก! rapidly ขยายกริยา grew (เติบโตอย่างรวดเร็ว)',
       errorMsg: 'ยังไม่ใช่! ลองหาคำที่ลงท้ายด้วย -ly ที่ขยายการกระทำดูนะ'
+    }
+  },
+  {
+    id: 'pronoun',
+    name: 'Pronoun',
+    thai: 'คำสรรพนาม',
+    color: '#a855f7', // purple
+    desc: 'ใช้แทนคำนาม (เช่น it, they, this, which) เพื่อลดการใช้คำซ้ำซ้อน ช่วยให้ประโยคใน Reading และ Writing สละสลวยขึ้น',
+    words: [
+      { word: 'They / Them', meaning: 'พวกเขา / พวกมัน', example: 'Students should review their notes if <span class="grammar-highlight">they</span> want to pass.' },
+      { word: 'Which', meaning: 'ซึ่ง, อันที่', example: 'He bought a new laptop, <span class="grammar-highlight">which</span> was very expensive.' },
+      { word: 'Those', meaning: 'เหล่านั้น', example: '<span class="grammar-highlight">Those</span> who study daily tend to perform better.' },
+      { word: 'Anyone', meaning: 'ใครก็ได้', example: '<span class="grammar-highlight">Anyone</span> can join the competition.' },
+      { word: 'Whatever', meaning: 'อะไรก็ตาม', example: 'You can eat <span class="grammar-highlight">whatever</span> you want.' },
+      { word: 'Themselves', meaning: 'พวกเขากันเอง/ด้วยตัวเอง', example: 'The students organized the event <span class="grammar-highlight">themselves</span>.' },
+      { word: 'Neither', meaning: 'ไม่ทั้งสองอย่าง', example: '<span class="grammar-highlight">Neither</span> of the answers is correct.' }
+    ],
+    challenge: {
+      type: 'Pronoun',
+      sentence: [
+        { text: 'Many', isTarget: false },
+        { text: 'students', isTarget: false },
+        { text: 'struggle,', isTarget: false },
+        { text: 'but', isTarget: false },
+        { text: 'they', isTarget: true },
+        { text: 'can', isTarget: false },
+        { text: 'improve.', isTarget: false }
+      ],
+      successMsg: 'ถูกต้อง! they แทนคำว่า students ในประโยคก่อนหน้า',
+      errorMsg: 'ลองอีกครั้ง! หาคำที่ใช้แทนคำนามที่กล่าวมาแล้ว'
     }
   },
   {
@@ -1109,54 +1064,14 @@ function renderGrammarView() {
 
 function renderGrammarDetails(data) {
   document.getElementById('grammar-detail-title').textContent = `${data.name} (${data.thai})`;
-  
+
   const badge = document.getElementById('grammar-detail-badge');
   badge.textContent = data.name.toUpperCase();
   badge.style.color = data.color;
   badge.style.borderColor = data.color;
-  badge.style.background = `${data.color}22`;
+  badge.style.background = `${data.color}22`; // 22 is hex alpha for ~13%
 
   document.getElementById('grammar-detail-desc').textContent = data.desc;
-
-  // Render suffix section (only if data has suffixes)
-  const suffixSection = document.getElementById('grammar-suffix-section');
-  if (data.suffixes && data.suffixes.length > 0) {
-    document.getElementById('grammar-suffix-title').textContent = data.id === 'verb' ? 'Common Verb Suffixes (ปัจจัยบอกคำกริยา)' : 'Common Noun Suffixes (ปัจจัยบอกคำนาม)';
-    document.getElementById('grammar-suffix-desc').textContent = data.id === 'verb' ? 'คำลงท้ายเหล่านี้ทำให้คำอื่นๆ กลายเป็นคำกริยา มักมีความหมายว่า "ทำให้เป็น..."' : 'คำลงท้ายเหล่านี้ช่วยให้รู้ว่าคำนั้นเป็นคำนาม แม้ไม่เคยเห็นมาก่อน!';
-    const suffixGrid = document.getElementById('grammar-suffix-grid');
-    suffixGrid.innerHTML = '';
-    data.suffixes.forEach(s => {
-      const card = document.createElement('div');
-      card.className = 'suffix-card';
-      card.style.borderLeftColor = s.color;
-      card.innerHTML = `
-        <div class="suffix-tag" style="background: ${s.color}22; color: ${s.color}; border: 1px solid ${s.color}66;">${s.suffix}</div>
-        <div class="suffix-meaning">${s.meaning}</div>
-        <div class="suffix-example">${s.example}</div>
-      `;
-      suffixGrid.appendChild(card);
-    });
-    suffixSection.style.display = '';
-  } else {
-    suffixSection.style.display = 'none';
-  }
-
-  // Render notes section (only if data has notes)
-  const notesSection = document.getElementById('grammar-notes-section');
-  if (data.notes && data.notes.length > 0) {
-    const notesList = document.getElementById('grammar-notes-list');
-    notesList.innerHTML = '';
-    data.notes.forEach(note => {
-      const el = document.createElement('div');
-      el.className = 'grammar-note-item';
-      el.style.borderLeftColor = data.color;
-      el.innerHTML = `<strong>${note.title}:</strong> ${note.desc}`;
-      notesList.appendChild(el);
-    });
-    notesSection.style.display = '';
-  } else {
-    notesSection.style.display = 'none';
-  }
 
   const vocabList = document.getElementById('grammar-vocab-list');
   vocabList.innerHTML = '';
@@ -1176,23 +1091,6 @@ function renderGrammarDetails(data) {
 
   document.getElementById('grammar-challenge-type').textContent = data.name;
   initGrammarChallenge(data.challenge);
-
-  // Render advanced patterns (e.g. for Verb)
-  const advancedSection = document.getElementById('grammar-advanced-patterns-section');
-  if (data.advancedPatterns && data.advancedPatterns.length > 0) {
-    const list = document.getElementById('grammar-advanced-patterns-list');
-    list.innerHTML = '';
-    data.advancedPatterns.forEach(pattern => {
-      const el = document.createElement('div');
-      el.className = 'grammar-note-item';
-      el.style.borderLeftColor = data.color;
-      el.innerHTML = `<strong>${pattern.title}:</strong> <div style="margin-top:0.25rem;">${pattern.desc}</div><div class="grammar-note-example"><strong>Example:</strong> ${pattern.example}</div>`;
-      list.appendChild(el);
-    });
-    advancedSection.style.display = '';
-  } else {
-    advancedSection.style.display = 'none';
-  }
 }
 
 function initGrammarChallenge(challenge) {
