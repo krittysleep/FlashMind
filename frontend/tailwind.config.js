@@ -12,11 +12,11 @@ export default {
         bgGlass: 'var(--bg-glass)',
         borderGlass: 'var(--border-glass)',
         borderGlow: 'var(--border-glow)',
-        
+
         textPrimary: 'var(--text-primary)',
         textSecondary: 'var(--text-secondary)',
         textMuted: 'var(--text-muted)',
-        
+
         accentPurple: 'var(--accent-purple)',
         accentBlue: 'var(--accent-blue)',
         accentOrange: 'var(--accent-orange)',

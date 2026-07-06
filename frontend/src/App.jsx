@@ -12,19 +12,19 @@ function App() {
   const [decks, setDecks] = useState([])
   const [currentDeck, setCurrentDeck] = useState(null)
   const [editorState, setEditorState] = useState(null)
-  
+
   // Modals state
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [deckToDelete, setDeckToDelete] = useState(null)
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false)
-  
+
   // Voices for TTS
   const [availableVoices, setAvailableVoices] = useState([])
   const [selectedVoice, setSelectedVoice] = useState('')
 
   useEffect(() => {
     loadDecks()
-    
+
     // Setup TTS voices
     const synth = window.speechSynthesis
     if (synth) {
@@ -67,18 +67,18 @@ function App() {
   const studyRandomCard = () => {
     const allCards = decks.flatMap(d => d.cards || [])
     if (allCards.length === 0) return
-    
+
     // Shuffle and pick up to 20 random cards
     const shuffled = [...allCards].sort(() => 0.5 - Math.random())
     const selectedCards = shuffled.slice(0, 20)
-    
+
     const virtualDeck = {
       id: 'random',
       name: `Random Mix (${selectedCards.length} Cards)`,
       cards: selectedCards,
       color: '#ec4899'
     }
-    
+
     navigateTo('study', virtualDeck)
   }
 
@@ -87,7 +87,7 @@ function App() {
     if (window.speechSynthesis && window.speechSynthesis.speaking) {
       window.speechSynthesis.cancel()
     }
-    
+
     if (view === 'study') {
       setCurrentDeck(data)
     } else if (view === 'editor') {
@@ -104,8 +104,8 @@ function App() {
         <div className="glow-orb glow-orb-3"></div>
       </div>
 
-      <Navigation 
-        currentView={currentView} 
+      <Navigation
+        currentView={currentView}
         navigateTo={navigateTo}
         availableVoices={availableVoices}
         selectedVoice={selectedVoice}
@@ -115,44 +115,44 @@ function App() {
 
       <main>
         {currentView === 'dashboard' && (
-          <Dashboard 
-            decks={decks} 
+          <Dashboard
+            decks={decks}
             navigateTo={navigateTo}
             openDeleteModal={(deck) => { setDeckToDelete(deck); setIsDeleteModalOpen(true); }}
           />
         )}
-        
+
         {currentView === 'study' && (
-          <StudyMode 
-            deck={currentDeck} 
+          <StudyMode
+            deck={currentDeck}
             navigateTo={navigateTo}
             selectedVoice={selectedVoice}
             availableVoices={availableVoices}
             studyRandomCard={studyRandomCard}
           />
         )}
-        
+
         {currentView === 'editor' && (
-          <DeckEditor 
-            editorState={editorState} 
+          <DeckEditor
+            editorState={editorState}
             navigateTo={navigateTo}
             reloadDecks={loadDecks}
           />
         )}
-        
+
         {currentView === 'grammar' && (
           <GrammarGuide />
         )}
-        
+
         {currentView === 'game' && (
-          <VocabGame 
+          <VocabGame
             decks={decks}
             navigateTo={navigateTo}
           />
         )}
       </main>
 
-      <Modals 
+      <Modals
         isDeleteModalOpen={isDeleteModalOpen}
         closeDeleteModal={() => setIsDeleteModalOpen(false)}
         deckToDelete={deckToDelete}

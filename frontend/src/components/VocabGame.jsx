@@ -3,10 +3,10 @@ import '../game.css'
 
 const generateMask = (word) => {
   if (!word || word.length < 3) return word;
-  
+
   const chars = word.split('');
   let masked = '';
-  
+
   for (let i = 0; i < chars.length; i++) {
     // Always show first, second, and last letter
     if (i === 0 || i === 1 || i === chars.length - 1) {
@@ -32,7 +32,7 @@ const VocabGame = ({ decks, navigateTo }) => {
   const [gameState, setGameState] = useState('start') // start, playing, result
   const [userInput, setUserInput] = useState('')
   const [feedback, setFeedback] = useState(null) // 'correct', 'incorrect'
-  
+
   const inputRef = useRef(null)
 
   useEffect(() => {
@@ -45,7 +45,7 @@ const VocabGame = ({ decks, navigateTo }) => {
   const startGame = () => {
     // Gather all valid cards (must have an example and a clean word)
     let allValidCards = [];
-    
+
     decks.forEach(deck => {
       if (deck.cards) {
         deck.cards.forEach(card => {
@@ -74,18 +74,18 @@ const VocabGame = ({ decks, navigateTo }) => {
     const generatedQuestions = selected.map(card => {
       const cleanWord = card.cleanWord;
       const maskedWord = generateMask(cleanWord);
-      
+
       // Extract example sentence
       let sentence = "No example found.";
       const ieltsMatch = card.back.match(/IELTS Writing Example:\s*(.*)/i);
       const regularMatch = card.back.match(/Example:\s*(.*?)(\n|$)/i);
-      
+
       if (ieltsMatch) {
         sentence = ieltsMatch[1];
       } else if (regularMatch) {
         sentence = regularMatch[1];
       }
-      
+
       // Mask the word in the sentence (case-insensitive)
       const regex = new RegExp(cleanWord, 'gi');
       const blankedSentence = sentence.replace(regex, '________');
@@ -184,7 +184,7 @@ const VocabGame = ({ decks, navigateTo }) => {
         <div className="game-thai-meaning">
           {currentQ.thai}
         </div>
-        
+
         <div className="game-masked-word">
           {feedback === 'incorrect' ? currentQ.word : currentQ.masked}
         </div>
@@ -194,8 +194,8 @@ const VocabGame = ({ decks, navigateTo }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="game-input-form">
-          <input 
-            type="text" 
+          <input
+            type="text"
             ref={inputRef}
             className="game-input"
             value={userInput}
@@ -205,8 +205,8 @@ const VocabGame = ({ decks, navigateTo }) => {
             autoComplete="off"
             spellCheck="false"
           />
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             className="btn btn-primary"
             disabled={!userInput.trim() || feedback !== null}
           >
@@ -219,7 +219,7 @@ const VocabGame = ({ decks, navigateTo }) => {
             Correct! 🎉
           </div>
         )}
-        
+
         {feedback === 'incorrect' && (
           <div className="feedback-message error-message">
             Incorrect. The word was <strong>{currentQ.word}</strong>.
