@@ -5,6 +5,7 @@ import StudyMode from './components/StudyMode'
 import DeckEditor from './components/DeckEditor'
 import GrammarGuide from './components/GrammarGuide'
 import Modals from './components/Modals'
+import VocabGame from './components/VocabGame'
 
 function App() {
   const [currentView, setCurrentView] = useState('dashboard')
@@ -63,6 +64,24 @@ function App() {
     }
   }
 
+  const studyRandomCard = () => {
+    const allCards = decks.flatMap(d => d.cards || [])
+    if (allCards.length === 0) return
+    
+    // Shuffle and pick up to 20 random cards
+    const shuffled = [...allCards].sort(() => 0.5 - Math.random())
+    const selectedCards = shuffled.slice(0, 20)
+    
+    const virtualDeck = {
+      id: 'random',
+      name: `Random Mix (${selectedCards.length} Cards)`,
+      cards: selectedCards,
+      color: '#ec4899'
+    }
+    
+    navigateTo('study', virtualDeck)
+  }
+
   const navigateTo = (view, data = null) => {
     // cancel speech if playing
     if (window.speechSynthesis && window.speechSynthesis.speaking) {
@@ -81,8 +100,8 @@ function App() {
     <>
       <div className="background-glow">
         <div className="glow-orb glow-orb-1"></div>
-        <div class="glow-orb glow-orb-2"></div>
-        <div class="glow-orb glow-orb-3"></div>
+        <div className="glow-orb glow-orb-2"></div>
+        <div className="glow-orb glow-orb-3"></div>
       </div>
 
       <Navigation 
@@ -109,6 +128,7 @@ function App() {
             navigateTo={navigateTo}
             selectedVoice={selectedVoice}
             availableVoices={availableVoices}
+            studyRandomCard={studyRandomCard}
           />
         )}
         
@@ -122,6 +142,13 @@ function App() {
         
         {currentView === 'grammar' && (
           <GrammarGuide />
+        )}
+        
+        {currentView === 'game' && (
+          <VocabGame 
+            decks={decks}
+            navigateTo={navigateTo}
+          />
         )}
       </main>
 

@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 function DeckEditor({ editorState, navigateTo, reloadDecks }) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [color, setColor] = useState('purple')
+  const [color, setColor] = useState('green')
   const [cards, setCards] = useState([])
   const [isSaving, setIsSaving] = useState(false)
 
@@ -13,12 +13,12 @@ function DeckEditor({ editorState, navigateTo, reloadDecks }) {
     if (editorState) {
       setName(editorState.name || '')
       setDescription(editorState.description || '')
-      setColor(editorState.color || 'purple')
+      setColor(editorState.color || 'green')
       setCards(editorState.cards ? [...editorState.cards] : [])
     } else {
       setName('')
       setDescription('')
-      setColor('purple')
+      setColor('green')
       setCards([
         { id: Math.random().toString(), front: '', back: '' },
         { id: Math.random().toString(), front: '', back: '' }

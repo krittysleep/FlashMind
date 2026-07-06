@@ -24,7 +24,7 @@ const posMap = {
   'interj.':  { name: 'interjection',     cls: 'other' },
 }
 
-function StudyMode({ deck, navigateTo, selectedVoice, availableVoices }) {
+function StudyMode({ deck, navigateTo, selectedVoice, availableVoices, studyRandomCard }) {
   const [cards, setCards] = useState([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isFlipped, setIsFlipped] = useState(false)
@@ -122,8 +122,14 @@ function StudyMode({ deck, navigateTo, selectedVoice, availableVoices }) {
           </div>
         </div>
         <div className="results-percentage">{percentage}%</div>
-        <div style={{display: 'flex', gap: '1rem', marginTop: '2rem'}}>
+        <div style={{display: 'flex', gap: '1rem', marginTop: '2rem', flexWrap: 'wrap', justifyContent: 'center'}}>
           <button className="btn btn-secondary" onClick={() => navigateTo('dashboard')}>Back to Decks</button>
+          <button className="btn btn-secondary" onClick={studyRandomCard}>
+            <svg style={{width: '18px', height: '18px', fill: 'currentColor'}} viewBox="0 0 24 24">
+              <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
+            </svg>
+            Random Flashcard
+          </button>
           <button className="btn btn-primary" onClick={() => {
             setCards(shuffleArray([...deck.cards]))
             setCurrentIndex(0)

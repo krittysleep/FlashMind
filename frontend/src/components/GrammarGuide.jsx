@@ -6,7 +6,14 @@ function GrammarGuide() {
   const [activeTab, setActiveTab] = useState('overview')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  const [challengeFeedback, setChallengeFeedback] = useState(null)
+  const [challengeFeedback, setChallengeFeedback] = useState({})
+  const [typedAnswers, setTypedAnswers] = useState({})
+
+  // Clean up feedback and typed answers when switching categories
+  useEffect(() => {
+    setChallengeFeedback({})
+    setTypedAnswers({})
+  }, [activeItem])
 
   useEffect(() => {
     const fetchGrammar = async () => {
@@ -25,14 +32,72 @@ function GrammarGuide() {
     fetchGrammar()
   }, [])
 
-  const handleChallengeClick = (token, challenge) => {
+  const handleChallengeClick = (token, challenge, chalId = 'default') => {
     if (token.isTarget) {
-      setChallengeFeedback({ type: 'success', text: challenge.successMsg, tokenId: token.text })
+      setChallengeFeedback(prev => ({...prev, [chalId]: { type: 'success', text: challenge.successMsg, tokenId: token.text }}))
     } else {
-      setChallengeFeedback({ type: 'error', text: challenge.errorMsg, tokenId: token.text })
+      const correctWords = challenge.sentence.filter(t => t.isTarget).map(t => t.text).join(' ');
+      setChallengeFeedback(prev => ({...prev, [chalId]: { type: 'error', text: `${challenge.errorMsg} เฉลย: ${correctWords}`, tokenId: token.text }}))
       setTimeout(() => {
-        setChallengeFeedback(prev => (prev?.tokenId === token.text ? null : prev))
-      }, 1000)
+        setChallengeFeedback(prev => ({...prev, [chalId]: (prev[chalId]?.tokenId === token.text ? null : prev[chalId])}))
+      }, 3000)
+    }
+  }
+
+  const checkTypedTranslation = (challenge) => {
+    // Basic normalization: lowercase, remove punctuation except spaces
+    const normalize = (str) => str.toLowerCase().replace(/[.,!?;:]/g, '').trim();
+    const answer = typedAnswers[challenge.id] || '';
+    
+    if (normalize(answer) === normalize(challenge.englishSentence)) {
+      setChallengeFeedback(prev => ({...prev, [challenge.id]: { type: 'success', text: challenge.successMsg }}));
+    } else {
+      setChallengeFeedback(prev => ({...prev, [challenge.id]: { type: 'error', text: `${challenge.errorMsg} เฉลย: ${challenge.englishSentence}` }}));
+    }
+  }
+
+  const randomizeChallenge = async (indexToReplace) => {
+    try {
+      let isDifferent = false;
+      let attempts = 0;
+      let newData;
+      
+      const currentSentences = (activeItem.challenges || [activeItem.challenge]).map(c => 
+        c.sentenceText || c.englishSentence || c.sentence?.map(s=>s.text).join(' ')
+      );
+      
+      while (!isDifferent && attempts < 10) {
+        const res = await fetch(`/api/grammar/${activeItem.id}`);
+        if (res.ok) {
+          newData = await res.json();
+          const newChallenge = newData.challenges ? newData.challenges[indexToReplace] : newData.challenge;
+          const newSentence = newChallenge.sentenceText || newChallenge.englishSentence || newChallenge.sentence?.map(s=>s.text).join(' ');
+          
+          if (!currentSentences.includes(newSentence)) {
+            isDifferent = true;
+          }
+        }
+        attempts++;
+      }
+      
+      if (newData) {
+        setActiveItem(prev => {
+          const updated = { ...prev };
+          if (updated.challenges && newData.challenges) {
+            updated.challenges[indexToReplace] = newData.challenges[indexToReplace];
+          } else if (newData.challenge) {
+            updated.challenge = newData.challenge;
+          }
+          return updated;
+        });
+        
+        // Reset feedback and typed answer for this challenge
+        const chalId = activeItem.challenges ? activeItem.challenges[indexToReplace].id : activeItem.challenge.id;
+        setChallengeFeedback(prev => ({...prev, [chalId]: null}));
+        setTypedAnswers(prev => ({...prev, [chalId]: ''}));
+      }
+    } catch (e) {
+      console.error(e);
     }
   }
 
@@ -42,7 +107,7 @@ function GrammarGuide() {
   return (
     <div id="view-grammar" className="view active grammar-layout">
       <div className="grammar-sidebar">
-        <h2 style={{marginBottom: '1.5rem'}}>Parts of Speech</h2>
+        <h2 style={{marginBottom: '1.5rem'}}>Grammar Topics</h2>
         <div className="grammar-pos-grid">
           {grammarData.map(item => (
             <div 
@@ -117,7 +182,7 @@ function GrammarGuide() {
                   Patterns
                 </button>
               )}
-              {activeItem.challenge && (
+              {(activeItem.challenges || activeItem.challenge) && (
                 <button 
                   className={`grammar-inner-tab ${activeTab === 'challenge' ? 'active' : ''}`}
                   onClick={() => setActiveTab('challenge')}
@@ -176,7 +241,7 @@ function GrammarGuide() {
                           <span className="grammar-vocab-word">{wordObj.word}</span>
                           <span className="grammar-vocab-meaning">{wordObj.meaning}</span>
                         </div>
-                        {wordObj.example && <div className="grammar-vocab-example" dangerouslySetInnerHTML={{ __html: `" ${wordObj.example} "` }}></div>}
+                        {wordObj.example && <div className="grammar-vocab-example" style={{fontStyle: 'italic', color: 'var(--text-secondary)'}} dangerouslySetInnerHTML={{ __html: `"${wordObj.example}"` }}></div>}
                       </div>
                     ))}
                   </div>
@@ -198,34 +263,155 @@ function GrammarGuide() {
                 </div>
               )}
 
-              {activeTab === 'challenge' && activeItem.challenge && (
+              {activeTab === 'challenge' && (activeItem.challenges || activeItem.challenge) && (
                 <div className="grammar-section tab-fade-in">
                   <div className="grammar-challenge-box">
-                    <div className="challenge-header">
-                      <h3>Interactive Challenge</h3>
-                      <span className="challenge-badge">Identify the {activeItem.name}</span>
-                    </div>
-                    <p>Click on the <strong>{activeItem.name}</strong> in the sentence below:</p>
-                    
-                    <div className="challenge-sentence">
-                      {activeItem.challenge.sentence.map((token, i) => {
-                        const isError = challengeFeedback?.type === 'error' && challengeFeedback?.tokenId === token.text
-                        const isSuccess = challengeFeedback?.type === 'success' && token.isTarget
-                        return (
-                          <span 
-                            key={i} 
-                            className={`challenge-word ${isSuccess ? 'correct' : ''} ${isError ? 'incorrect' : ''}`}
-                            onClick={() => handleChallengeClick(token, activeItem.challenge)}
-                          >
-                            {token.text}
-                          </span>
-                        )
-                      })}
-                    </div>
-                    
-                    <div className={`challenge-feedback ${challengeFeedback?.type === 'success' ? 'feedback-success' : ''} ${challengeFeedback?.type === 'error' ? 'feedback-error' : ''}`}>
-                      {challengeFeedback?.text}
-                    </div>
+                    {(() => {
+                      const challenges = activeItem.challenges || [activeItem.challenge];
+                      return challenges.map((challenge, index) => (
+                        <div key={challenge.id || index} style={{ marginBottom: index < challenges.length - 1 ? '2.5rem' : '0', paddingBottom: index < challenges.length - 1 ? '2.5rem' : '0', borderBottom: index < challenges.length - 1 ? '1px dashed var(--border-color)' : 'none' }}>
+                          <div className="challenge-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <h3 style={{ margin: 0 }}>Interactive Challenge {challenges.length > 1 ? index + 1 : ''}</h3>
+                              <span className="challenge-badge">
+                                {challenge.type === 'multiple_choice' ? 'Identify the Tense' : challenge.type === 'typed_translation' ? 'Translate to English' : `Identify the ${activeItem.name}`}
+                              </span>
+                            </div>
+                            <button 
+                              onClick={() => randomizeChallenge(index)}
+                              style={{
+                                background: 'var(--bg-card-hover)',
+                                border: '1px solid var(--border-color)',
+                                color: 'var(--text-primary)',
+                                padding: '0.4rem 0.8rem',
+                                borderRadius: '0.5rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.3rem',
+                                fontSize: '0.9rem'
+                              }}
+                            >
+                              <svg style={{width: '16px', height: '16px', fill: 'currentColor'}} viewBox="0 0 24 24">
+                                <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                              </svg>
+                              Randomize
+                            </button>
+                          </div>
+                          
+                          {challenge.type === 'typed_translation' ? (
+                            <>
+                              <p>Translate this sentence to English:</p>
+                              <div className="challenge-sentence" style={{ fontSize: '1.2rem', padding: '1rem', background: 'var(--bg-main)', borderRadius: '0.5rem', marginBottom: '1.5rem', borderLeft: `4px solid ${activeItem.color}` }}>
+                                "{challenge.thaiSentence}"
+                              </div>
+                              
+                              <input 
+                                type="text"
+                                value={typedAnswers[challenge.id] || ''}
+                                onChange={(e) => setTypedAnswers(prev => ({...prev, [challenge.id]: e.target.value}))}
+                                placeholder="Type the English translation here..."
+                                disabled={challengeFeedback[challenge.id]?.type === 'success'}
+                                style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '0.5rem', color: 'var(--text-primary)', marginBottom: '1rem', outline: 'none' }}
+                                onKeyDown={(e) => { if (e.key === 'Enter' && typedAnswers[challenge.id]?.trim()) checkTypedTranslation(challenge) }}
+                              />
+                              
+                              <button 
+                                onClick={() => checkTypedTranslation(challenge)}
+                                disabled={challengeFeedback[challenge.id]?.type === 'success' || !typedAnswers[challenge.id]?.trim()}
+                                style={{ width: '100%', padding: '0.75rem', background: 'var(--accent-blue)', color: 'white', border: 'none', borderRadius: '0.5rem', cursor: (challengeFeedback[challenge.id]?.type === 'success' || !typedAnswers[challenge.id]?.trim()) ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: '1.1rem', opacity: (challengeFeedback[challenge.id]?.type === 'success' || !typedAnswers[challenge.id]?.trim()) ? 0.5 : 1 }}
+                              >
+                                Check Answer
+                              </button>
+                            </>
+                          ) : challenge.type === 'multiple_choice' ? (
+                            <>
+                              <p>{challenge.question}</p>
+                              <div className="challenge-sentence" style={{ fontSize: '1.2rem', padding: '1rem', background: 'var(--bg-main)', borderRadius: '0.5rem', marginBottom: '1.5rem', borderLeft: `4px solid ${activeItem.color}` }}>
+                                "{challenge.sentenceText}"
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+                                {challenge.options.map((option, i) => {
+                                  const isSelected = challengeFeedback[challenge.id]?.selectedOption === option;
+                                  const isCorrectOption = option === challenge.correctAnswer;
+                                  
+                                  let bg = 'transparent';
+                                  let border = '1px solid var(--border-color)';
+                                  let color = 'var(--text-primary)';
+                                  
+                                  if (challengeFeedback[challenge.id]) {
+                                     if (isSelected && isCorrectOption) {
+                                       bg = 'rgba(16, 185, 129, 0.1)';
+                                       border = '1px solid var(--accent-green)';
+                                       color = 'var(--accent-green)';
+                                     } else if (isSelected && !isCorrectOption) {
+                                       bg = 'rgba(239, 68, 68, 0.1)';
+                                       border = '1px solid var(--accent-red)';
+                                       color = 'var(--accent-red)';
+                                     } else if (isCorrectOption) {
+                                       bg = 'rgba(16, 185, 129, 0.1)';
+                                       border = '1px solid var(--accent-green)';
+                                       color = 'var(--accent-green)';
+                                     }
+                                  }
+                                  
+                                  return (
+                                    <button 
+                                      key={i}
+                                      style={{ 
+                                        textAlign: 'center', 
+                                        padding: '0.75rem', 
+                                        background: bg,
+                                        border: border, 
+                                        color: color,
+                                        borderRadius: '0.5rem',
+                                        cursor: challengeFeedback[challenge.id]?.type === 'success' ? 'default' : 'pointer',
+                                        transition: 'all 0.2s ease'
+                                      }}
+                                      onClick={() => {
+                                        if (challengeFeedback[challenge.id]?.type === 'success') return;
+                                        if (option === challenge.correctAnswer) {
+                                          setChallengeFeedback(prev => ({...prev, [challenge.id]: { type: 'success', text: challenge.successMsg, selectedOption: option }}));
+                                        } else {
+                                          setChallengeFeedback(prev => ({...prev, [challenge.id]: { type: 'error', text: `${challenge.errorMsg} เฉลย: ${challenge.correctAnswer}`, selectedOption: option }}));
+                                        }
+                                      }}
+                                    >
+                                      {option}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <p>Click on the <strong>{activeItem.name}</strong> in the sentence below:</p>
+                              
+                              <div className="challenge-sentence">
+                                {challenge.sentence?.map((token, i) => {
+                                  const chalId = challenge.id || index;
+                                  const isError = challengeFeedback[chalId]?.type === 'error' && challengeFeedback[chalId]?.tokenId === token.text;
+                                  const isSuccess = challengeFeedback[chalId]?.type === 'success' && token.isTarget;
+                                  return (
+                                    <span 
+                                      key={i} 
+                                      className={`challenge-word ${isSuccess ? 'correct' : ''} ${isError ? 'incorrect' : ''}`}
+                                      onClick={() => handleChallengeClick(token, challenge, chalId)}
+                                    >
+                                      {token.text}
+                                    </span>
+                                  )
+                                })}
+                              </div>
+                            </>
+                          )}
+                          
+                          <div className={`challenge-feedback ${challengeFeedback[challenge.id || index]?.type === 'success' ? 'feedback-success' : ''} ${challengeFeedback[challenge.id || index]?.type === 'error' ? 'feedback-error' : ''}`} style={{ marginTop: '1rem' }}>
+                            {challengeFeedback[challenge.id || index]?.text}
+                          </div>
+                        </div>
+                      ));
+                    })()}
                   </div>
                 </div>
               )}

@@ -50,6 +50,7 @@ function initSchema() {
       category_id TEXT NOT NULL,
       word TEXT NOT NULL,
       meaning TEXT,
+      definition TEXT,
       example TEXT,
       FOREIGN KEY (category_id) REFERENCES grammar_categories(id) ON DELETE CASCADE
     );
@@ -187,26 +188,84 @@ function getGrammarCategoryById(id) {
   const cat = db.prepare('SELECT * FROM grammar_categories WHERE id = ?').get(id);
   if (!cat) return null;
 
-  cat.words = db.prepare('SELECT * FROM grammar_words WHERE category_id = ?').all(id);
+  cat.words = db.prepare('SELECT * FROM grammar_words WHERE category_id = ? ORDER BY RANDOM() LIMIT 8').all(id);
   cat.suffixes = db.prepare('SELECT * FROM grammar_suffixes WHERE category_id = ?').all(id);
   cat.notes = db.prepare('SELECT * FROM grammar_notes WHERE category_id = ? ORDER BY sort_order').all(id);
   cat.advancedPatterns = db.prepare('SELECT * FROM grammar_patterns WHERE category_id = ? ORDER BY sort_order').all(id);
 
-  // Challenge
-  const challenge = db.prepare('SELECT * FROM grammar_challenges WHERE category_id = ?').get(id);
-  if (challenge) {
-    challenge.sentence = db.prepare('SELECT * FROM challenge_tokens WHERE challenge_id = ? ORDER BY sort_order').all(challenge.id);
-    // Map is_target from int to boolean
-    challenge.sentence = challenge.sentence.map(t => ({
-      text: t.text,
-      isTarget: t.is_target === 1
-    }));
-    cat.challenge = {
-      type: challenge.type,
-      successMsg: challenge.success_msg,
-      errorMsg: challenge.error_msg,
-      sentence: challenge.sentence
-    };
+  // Dynamic Challenge Generation from Random Vocab
+  if (cat.words && cat.words.length > 0) {
+    const randomWordRow = cat.words[Math.floor(Math.random() * cat.words.length)];
+    
+    if (cat.id === 'tenses') {
+      cat.challenges = [];
+      
+      let shuffledWords = [...cat.words].sort(() => 0.5 - Math.random());
+      const wordForMC = shuffledWords[0];
+      const wordForType = shuffledWords.length > 1 ? shuffledWords[1] : shuffledWords[0];
+      
+      // Challenge 1: Multiple Choice
+      const plainSentenceMC = wordForMC.example.replace(/<[^>]+>/g, '');
+      const tenseMatch = wordForMC.meaning.match(/\((.*?)\)/);
+      const correctTense = tenseMatch ? tenseMatch[1] : 'Present Simple';
+      
+      const allTenses = [
+        'Present Simple', 'Present Continuous', 'Present Perfect', 'Present Perfect Continuous',
+        'Past Simple', 'Past Continuous', 'Past Perfect', 'Past Perfect Continuous',
+        'Future Simple', 'Future Continuous', 'Future Perfect', 'Future Perfect Continuous'
+      ];
+      
+      const wrongTenses = allTenses.filter(t => t !== correctTense).sort(() => 0.5 - Math.random()).slice(0, 3);
+      const options = [correctTense, ...wrongTenses].sort(() => 0.5 - Math.random());
+      
+      cat.challenges.push({
+        id: 'mc_1',
+        type: 'multiple_choice',
+        question: `Which tense is used in this sentence?`,
+        sentenceText: plainSentenceMC,
+        options: options,
+        correctAnswer: correctTense,
+        successMsg: `ถูกต้อง! ประโยคนี้คือ ${correctTense}`,
+        errorMsg: `ยังไม่ใช่! ลองพิจารณาโครงสร้างประโยคดูใหม่นะ`
+      });
+      
+      // Challenge 2: Typed Translation
+      if (wordForType.thai_example) {
+        const plainSentenceType = wordForType.example.replace(/<[^>]+>/g, '');
+        cat.challenges.push({
+          id: 'type_1',
+          type: 'typed_translation',
+          thaiSentence: wordForType.thai_example,
+          englishSentence: plainSentenceType,
+          successMsg: 'ถูกต้อง! คุณแต่งประโยคได้สมบูรณ์แบบ',
+          errorMsg: 'ยังไม่ใช่! ลองตรวจสอบตัวสะกดและโครงสร้างอีกครั้ง'
+        });
+      }
+    } else {
+      // Interactive Token Challenge for other parts of speech
+      cat.challenge = {
+        type: 'identify_word',
+        successMsg: `ถูกต้อง! "${randomWordRow.word}" คือคำศัพท์หมวด ${cat.name}`,
+        errorMsg: `ยังไม่ใช่! ลองหาคำที่มีความหมายว่า "${randomWordRow.meaning}" ดูนะ`
+      };
+      
+      const rawExample = randomWordRow.example || '';
+      let modifiedEx = rawExample.replace(/<span class="grammar-highlight">/g, '[[[').replace(/<\/span>/g, ']]]');
+      let chunks = modifiedEx.split(' ');
+      let inTargetPhase = false;
+      
+      cat.challenge.sentence = chunks.map((chunk, index) => {
+        if (chunk.includes('[[[')) inTargetPhase = true;
+        let targetFlag = inTargetPhase ? 1 : 0;
+        if (chunk.includes(']]]')) inTargetPhase = false;
+        
+        return {
+          id: index,
+          text: chunk.replace(/\[\[\[/g, '').replace(/\]\]\]/g, '').replace(/<[^>]+>/g, ''),
+          isTarget: targetFlag
+        };
+      });
+    }
   }
 
   return cat;

@@ -29,7 +29,7 @@ function Dashboard({ decks, navigateTo, openDeleteModal }) {
             const cardsLabel = cardCount === 1 ? '1 card' : `${cardCount} cards`;
             
             return (
-              <div key={deck.id} className={`deck-card color-${deck.color || 'purple'}`}>
+              <div key={deck.id} className={`deck-card color-${deck.color || 'green'}`}>
                 <div className="deck-info">
                   <div className="deck-card-title">{deck.name}</div>
                   <div className="deck-card-desc">{deck.description || 'No description provided.'}</div>
